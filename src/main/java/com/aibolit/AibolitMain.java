@@ -4,6 +4,7 @@ import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -15,12 +16,17 @@ import static net.sourceforge.tess4j.ITessAPI.TessOcrEngineMode.*;
 import static net.sourceforge.tess4j.ITessAPI.TessPageSegMode.PSM_SINGLE_BLOCK;
 
 public class AibolitMain {
+
+    private static int getY(Word word) {
+        return (int) word.getBoundingBox().getY();
+    }
+
     public static void main(String[] args) {
         // System.setProperty("jna.library.path", "32".equals(System.getProperty("sun.arch.data.model")) ? "lib/win32-x86" : "lib/win32-x86-64");
 
         BufferedImage img = null;
         try {
-            img = ImageIO.read(new File("test2.jpg"));
+            img = ImageIO.read(new File("test21.jpg"));
         } catch (IOException e) {
         }
 
@@ -45,7 +51,31 @@ public class AibolitMain {
             e.printStackTrace();
         }
         instance.setTessVariable("tessedit_char_whitelist", "0123456789.-");
-        System.out.println(instance.getWords(img2, 3));
+        words = instance.getWords(img2, 3);
+        words.sort(Comparator.comparingInt(o -> getY(o)));
+        int wordsEnd = 1;
+
+        if (words.size() == 2) {
+            if (getY(words.get(1)) - getY(words.get(0)) <= words.get(0).getBoundingBox().getHeight() * 2) {
+                wordsEnd = 2;
+            }
+        }
+
+        if (words.size() > 2) {
+            int delta = getY(words.get(1)) - getY(words.get(0));
+            for (int i = 2; i < words.size(); ++i) {
+                int currDelta = getY(words.get(i)) - getY(words.get(i-1));
+                if (delta * 1.2 >= currDelta) {
+                    ++wordsEnd;
+                }
+                else break;
+            }
+        }
+
+        words = words.subList(0, wordsEnd + 1);
+
+        System.out.println(words);
+
         //instance.setPageSegMode(PSM_SINGLE_BLOCK);
         // ITesseract instance = new Tesseract1(); // JNA Direct Mapping
         // File tessDataFolder = LoadLibs.extractTessResources("tessdata"); // Maven build bundles English data
