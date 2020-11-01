@@ -26,8 +26,10 @@ public class AibolitMain {
 
         BufferedImage img = null;
         try {
-            img = ImageIO.read(new File("test21.jpg"));
-        } catch (IOException e) {
+            /*img = ImageIO.read(new File("test21.jpg"));*/
+            Rectangle screenRect = new Rectangle(Toolkit.getDefaultToolkit().getScreenSize());
+            img = new Robot().createScreenCapture(screenRect);
+        } catch (Exception e) {
         }
 
         //File imageFile = new File("test2.png");
@@ -37,56 +39,58 @@ public class AibolitMain {
         instance.setLanguage("eng");
         instance.setOcrEngineMode(OEM_TESSERACT_LSTM_COMBINED);
         List<Word> words = instance.getWords(img, 3);
-        List<Word> tscores = words.stream().filter(it -> it.getText().equals("T-score")).collect(Collectors.toList());
-        Word tscore = tscores.get(0);
-        Rectangle box = tscore.getBoundingBox();
-        BufferedImage img1 = img.getSubimage((int) box.getX(), (int) box.getY(), (int) box.getWidth(), (int) (img.getHeight() - box.getY()));
-        File outputfile1 = new File("img1.jpg");
-        BufferedImage img2 = img.getSubimage((int) box.getX(), (int) (box.getY() + box.getHeight()), (int) box.getWidth(), (int) (img.getHeight() - box.getY() - box.getHeight()));
-        File outputfile2 = new File("img2.jpg");
-        try {
-            ImageIO.write(img1, "jpg", outputfile1);
-            ImageIO.write(img2, "jpg", outputfile2);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        instance.setTessVariable("tessedit_char_whitelist", "0123456789.-");
-        words = instance.getWords(img2, 3);
-        words.sort(Comparator.comparingInt(o -> getY(o)));
-        int wordsEnd = 1;
+        List<Word> tscores = words.stream().filter(it -> it.getText().trim().equals("T-score")).collect(Collectors.toList());
+        //Word tscore = tscores.get(0);
+        for (Word tscore: tscores) {
+            Rectangle box = tscore.getBoundingBox();
+           /* BufferedImage img1 = img.getSubimage((int) box.getX(), (int) box.getY(), (int) box.getWidth(), (int) (img.getHeight() - box.getY()));
+            File outputfile1 = new File("img1.jpg");*/
+            BufferedImage subimage = img.getSubimage((int) box.getX(), (int) (box.getY() + box.getHeight()), (int) box.getWidth(), (int) (img.getHeight() - box.getY() - box.getHeight()));
+           /* File outputfile = new File("img2.jpg");
+            try {
+                ImageIO.write(img1, "jpg", outputfile1);
+                ImageIO.write(img2, "jpg", outputfile2);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }*/
+            instance.setTessVariable("tessedit_char_whitelist", "0123456789.-");
+            words = instance.getWords(subimage, 3);
+            words.sort(Comparator.comparingInt(AibolitMain::getY));
 
-        if (words.size() == 2) {
-            if (getY(words.get(1)) - getY(words.get(0)) <= words.get(0).getBoundingBox().getHeight() * 2) {
-                wordsEnd = 2;
-            }
-        }
+            int wordsEnd = 1;
 
-        if (words.size() > 2) {
-            int delta = getY(words.get(1)) - getY(words.get(0));
-            for (int i = 2; i < words.size(); ++i) {
-                int currDelta = getY(words.get(i)) - getY(words.get(i-1));
-                if (delta * 1.2 >= currDelta) {
-                    ++wordsEnd;
+            if (words.size() == 2) {
+                if (getY(words.get(1)) - getY(words.get(0)) <= words.get(0).getBoundingBox().getHeight() * 2) {
+                    wordsEnd = 2;
                 }
-                else break;
             }
+
+            if (words.size() > 2) {
+                int delta = getY(words.get(1)) - getY(words.get(0));
+                for (int i = 2; i < words.size(); ++i) {
+                    int currDelta = getY(words.get(i)) - getY(words.get(i - 1));
+                    if (delta * 1.2 >= currDelta) {
+                        ++wordsEnd;
+                    } else break;
+                }
+            }
+
+            words = words.subList(0, wordsEnd + 1);
+
+            System.out.println("==============================");
+            System.out.println(words);
         }
-
-        words = words.subList(0, wordsEnd + 1);
-
-        System.out.println(words);
-
         //instance.setPageSegMode(PSM_SINGLE_BLOCK);
         // ITesseract instance = new Tesseract1(); // JNA Direct Mapping
         // File tessDataFolder = LoadLibs.extractTessResources("tessdata"); // Maven build bundles English data
         // instance.setDatapath(tessDataFolder.getPath());
 
-        try {
+        /*try {
             //String result = instance.doOCR(img, new Rectangle(355, 347, 61, 28));
             String result = instance.doOCR(img2);
             System.out.println(result);
         } catch (TesseractException e) {
             System.err.println(e.getMessage());
-        }
+        }*/
     }
 }
