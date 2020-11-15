@@ -17,6 +17,41 @@ import static net.sourceforge.tess4j.ITessAPI.TessPageSegMode.PSM_SINGLE_BLOCK;
 
 public class AibolitMain {
 
+    static final String tscore = "t-score";
+
+    public static int levenstain(String str1, String str2) {
+        int[] Di_1 = new int[str2.length() + 1];
+        int[] Di = new int[str2.length() + 1];
+
+        for (int j = 0; j <= str2.length(); j++) {
+            Di[j] = j; // (i == 0)
+        }
+
+        for (int i = 1; i <= str1.length(); i++) {
+            System.arraycopy(Di, 0, Di_1, 0, Di_1.length);
+
+            Di[0] = i; // (j == 0)
+            for (int j = 1; j <= str2.length(); j++) {
+                Di[j] = min(
+                        Di_1[j] + 1,
+                        Di[j - 1] + 1,
+                        Di_1[j - 1] + ((str1.charAt(i - 1) != str2.charAt(j - 1)) ? 1 : 0)
+                );
+            }
+        }
+
+        return Di[Di.length - 1];
+    }
+
+    public static boolean isTscoreCandidate(Word word) {
+        String text = word.getText().trim().toLowerCase();
+        return !text.equals(tscore) && !text.equals("score")&& (levenstain(tscore, text) <=2);
+    }
+
+    private static int min(int n1, int n2, int n3) {
+        return Math.min(Math.min(n1, n2), n3);
+    }
+
     private static int getY(Word word) {
         return (int) word.getBoundingBox().getY();
     }
@@ -37,9 +72,14 @@ public class AibolitMain {
         //instance.setTessVariable("tessedit_char_whitelist", "0123456789.");
         //instance.setLanguage("rus");
         instance.setLanguage("eng");
-        instance.setOcrEngineMode(OEM_TESSERACT_LSTM_COMBINED);
+        //instance.setOcrEngineMode(OEM_TESSERACT_LSTM_COMBINED);
+        //instance.setOcrEngineMode(OEM_TESSERACT_ONLY);
+        instance.setOcrEngineMode(OEM_LSTM_ONLY);
+
+        instance.setTessVariable("user_defined_dpi", "92");
         List<Word> words = instance.getWords(img, 3);
-        List<Word> tscores = words.stream().filter(it -> it.getText().trim().toLowerCase().equals("t-score")).collect(Collectors.toList());
+        List<Word> tscores = words.stream().filter(it -> it.getText().trim().toLowerCase().equals(tscore)).collect(Collectors.toList());
+        List<Word> tscoresCandidates = words.stream().filter(AibolitMain::isTscoreCandidate).collect(Collectors.toList());
         //Word tscore = tscores.get(0);
         int iter = 0;
         for (Word tscore: tscores) {
