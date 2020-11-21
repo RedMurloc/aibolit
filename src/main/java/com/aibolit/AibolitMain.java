@@ -1,6 +1,8 @@
 package com.aibolit;
 
-import java.awt.*;
+import java.awt.Robot;
+import java.awt.Rectangle;
+import java.awt.Toolkit;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
@@ -45,7 +47,7 @@ public class AibolitMain {
 
     public static boolean isTscoreCandidate(Word word) {
         String text = word.getText().trim().toLowerCase();
-        return !text.equals(tscore) && !text.equals("score")&& (levenstain(tscore, text) <=2);
+        return !text.equals(tscore) && !text.equals("score") && (levenstain(tscore, text) <= 2);
     }
 
     private static int min(int n1, int n2, int n3) {
@@ -56,6 +58,18 @@ public class AibolitMain {
         return (int) word.getBoundingBox().getY();
     }
 
+    private static Rectangle getSafeWiderBox(Rectangle box) {
+        int width = (int) box.getWidth();
+        int height = (int) box.getHeight();
+        Rectangle newBox = new Rectangle((int) Math.max(box.getX() - ((int) (width/5)), 0),
+                                         (int) Math.max(box.getY() - ((int) (height/5)), 0),
+                                         (int) (box.getWidth() * 1.4),
+                                         (int) (box.getHeight() * 1.4)
+        );
+        return newBox;
+    }
+
+
     public static void main(String[] args) {
         // System.setProperty("jna.library.path", "32".equals(System.getProperty("sun.arch.data.model")) ? "lib/win32-x86" : "lib/win32-x86-64");
 
@@ -65,7 +79,13 @@ public class AibolitMain {
             Rectangle screenRect = new Rectangle(Toolkit.getDefaultToolkit().getScreenSize());
             img = new Robot().createScreenCapture(screenRect);
         } catch (Exception e) {
+            e.printStackTrace();
         }
+
+       /* final ImageInfo imageInfo = Imaging.getImageInfo(file);
+
+        final int physicalWidthDpi = imageInfo.getPhysicalWidthDpi();
+        final int physicalHeightDpi = imageInfo.getPhysicalHeightDpi();*/
 
         //File imageFile = new File("test2.png");
         ITesseract instance = new Tesseract1();  // JNA Interface Mapping
@@ -76,10 +96,24 @@ public class AibolitMain {
         //instance.setOcrEngineMode(OEM_TESSERACT_ONLY);
         instance.setOcrEngineMode(OEM_LSTM_ONLY);
 
-        instance.setTessVariable("user_defined_dpi", "92");
+        //instance.setTessVariable("user_defined_dpi", "92");
         List<Word> words = instance.getWords(img, 3);
         List<Word> tscores = words.stream().filter(it -> it.getText().trim().toLowerCase().equals(tscore)).collect(Collectors.toList());
         List<Word> tscoresCandidates = words.stream().filter(AibolitMain::isTscoreCandidate).collect(Collectors.toList());
+
+        ITesseract instance2 = new Tesseract1();
+        instance2.setLanguage("eng");
+        instance2.setTessVariable("tessedit_char_whitelist", "Tt-Sscore");
+        for(Word candidate: tscoresCandidates) {
+            Rectangle box = candidate.getBoundingBox();
+            Rectangle newBox = getSafeWiderBox(box);
+            BufferedImage biggerImage = img.getSubimage((int) newBox.getX(), (int)  newBox.getY(), (int) newBox.getWidth(), (int)  newBox.getHeight());
+            List<Word> candidates = instance2.getWords(biggerImage, 3);
+            if (candidates.stream().map(it -> it.getText().trim().toLowerCase()).collect(Collectors.toList()).contains(tscore)) {
+                tscores.add(candidate);
+            }
+        }
+
         //Word tscore = tscores.get(0);
         int iter = 0;
         for (Word tscore: tscores) {
